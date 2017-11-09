@@ -117,18 +117,18 @@ public class Controller extends UnicastRemoteObject implements RmiInterface{
         }
 
     }
-
-    private void createRMIService() {
-        try {
-            view.showMessage("Creating rmi service: ...");
-            registry = LocateRegistry.createRegistry(rmiPort);
-            registry.rebind(rmiService, this);
-            view.showMessage("SUCCEED");
-        } catch (RemoteException ex) {
-            view.showMessage(ex.getMessage());
-            ex.printStackTrace();
-        }
-
-    }
+//
+//    private void createRMIService() {
+//        try {
+////            view.showMessage("Creating rmi service: ...");
+//            registry = LocateRegistry.createRegistry(rmiPort);
+//            registry.rebind(rmiService, this);
+//            view.showMessage("SUCCEED");
+//        } catch (RemoteException ex) {
+//            view.showMessage(ex.getMessage());
+//            ex.printStackTrace();
+//        }
+//
+//    }
 
 }
