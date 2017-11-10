@@ -130,5 +130,4 @@ public class Controller extends UnicastRemoteObject implements RmiInterface{
         }
 
     }
-
 }
