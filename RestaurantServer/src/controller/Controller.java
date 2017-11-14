@@ -21,9 +21,11 @@ import java.util.Date;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import model.Booking;
+import model.Customer;
 import model.Restaurant;
 import model.Table;
 import model.Time;
+import model.TimeStatistic;
 import rmi.RMIService;
 import view.ServerView;
 
@@ -258,7 +260,7 @@ public class Controller extends UnicastRemoteObject implements RMIService {
                 + "WHERE id = ? ";
 
         Time time = null;
-        
+
         try {
             PreparedStatement pst = con.prepareStatement(sql, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
             pst.setInt(1, id);
@@ -285,16 +287,16 @@ public class Controller extends UnicastRemoteObject implements RMIService {
         String date1 = format1.format(date);
         return date1;
     }
-    
+
     @Override
     public String booking(Booking booking) throws RemoteException {
-        
+
         String msg = "";
-        
+
         Table table = null;
         String sql = "INSERT INTO tblBooking(idRestaurant, numberOfCustomer, idTable, idTime, dateBooking, dateCreated, status) "
                 + "VALUES(?, ?, ?, ?, ?, ?, ?) ";
-        
+
         try {
             PreparedStatement pst = con.prepareStatement(sql);
             pst.setInt(1, booking.getRestaurant().getId());
@@ -304,9 +306,9 @@ public class Controller extends UnicastRemoteObject implements RMIService {
             pst.setString(5, booking.getDateBooking());
             pst.setString(6, getCurrentDate());
             pst.setString(7, "booking");
-            
+
             int rs = pst.executeUpdate();
-            
+
             if (rs > 0) {
                 msg = "Đặt bàn thành công";
             }
@@ -315,6 +317,190 @@ public class Controller extends UnicastRemoteObject implements RMIService {
             ex.printStackTrace();
         }
         return msg;
+    }
+
+    public Customer getCustomerById(int id) {
+        Customer customer = new Customer();
+
+        String sql = "SELECT * FROM tblCustomer "
+                + "WHERE id = ?";
+
+        try {
+            PreparedStatement pst = con.prepareStatement(sql, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
+            pst.setInt(1, id);
+
+            ResultSet rs = pst.executeQuery();
+            if (rs.last()) {
+                rs.beforeFirst();
+            }
+
+            rs.next();
+
+            int cid = rs.getInt(1);
+            String name = rs.getString(2);
+            String address = rs.getString(3);
+            String tel = rs.getString(4);
+            String email = rs.getString(5);
+
+            customer.setAddress(address);
+            customer.setEmail(email);
+            customer.setId(cid);
+            customer.setName(name);
+            customer.setTel(tel);
+
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+        }
+
+        return customer;
+    }
+
+    @Override
+    public ArrayList<Booking> searchBooking(String date, String customerName) throws RemoteException {
+
+        ArrayList<Booking> bookings = new ArrayList<>();
+
+        String sql = "SELECT * FROM tblBooking, tblCustomer "
+                + "WHERE tblBooking.dateBooking = ? "
+                + "AND tblBooking.idCustomer = tblCustomer.id "
+                + "AND tblCustomer.name LIKE ? "
+                + "AND status <> 'cancelled'";
+
+        try {
+            PreparedStatement pst = con.prepareStatement(sql, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
+            pst.setString(1, date);
+            pst.setString(2, "%" + customerName + "%");
+
+            ResultSet rs = pst.executeQuery();
+            if (rs.last()) {
+                rs.beforeFirst();
+            }
+
+            while (rs.next()) {
+
+                Booking booking = new Booking();
+
+                int id = rs.getInt(1);
+                int idCustomer = rs.getInt(2);
+                int numberOfCustomer = rs.getInt(3);
+                int idRestaurant = rs.getInt(4);
+                int idTable = rs.getInt(5);
+                int idTime = rs.getInt(6);
+                String dateBooking = rs.getString(7);
+                String dateCreated = rs.getString(8);
+                String status = rs.getString(9);
+
+                Table table = getTableById(idTable);
+                Restaurant restaurant = getRestaurantById(idRestaurant);
+                Time time = getTimeById(idTime);
+                Customer customer = getCustomerById(idCustomer);
+
+                booking.setCustomer(customer);
+                booking.setDateBooking(dateBooking);
+                booking.setDateCreate(dateCreated);
+                booking.setId(id);
+                booking.setNumberOfCustomer(numberOfCustomer);
+                booking.setRestaurant(restaurant);
+                booking.setStatus(status);
+                booking.setTable(table);
+                booking.setTime(time);
+
+                bookings.add(booking);
+
+            }
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+        }
+        System.out.println(bookings);
+        for (Booking booking : bookings) {
+            System.out.println(booking);
+        }
+        return bookings;
+    }
+
+    @Override
+    public String updateBooking(Booking booking, String status) throws RemoteException {
+        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    }
+
+    @Override
+    public String cancelBooking(int id) throws RemoteException {
+        String msg = "";
+
+        String sql = "UPDATE tblBooking "
+                + "SET status = 'cancelled' "
+                + "WHERE id = ?";
+
+        try {
+            PreparedStatement pst = con.prepareStatement(sql);
+            pst.setInt(1, id);
+
+            int rs = pst.executeUpdate();
+            if (rs > 0) {
+                msg = "Hủy đặt bàn thành công";
+            }
+        } catch (SQLException ex) {
+            msg = ex.getMessage();
+            ex.printStackTrace();
+        }
+
+        return msg;
+    }
+
+    @Override
+    public String addNewTable(Table table) throws RemoteException {
+        String sql = "INSERT INTO tblTable(name, minSeat, maxSeat, description) "
+                + "VALUES(?, ?, ?, ?) ";
+
+        String msg = "";
+
+        try {
+            PreparedStatement pst = con.prepareStatement(sql);
+            pst.setString(1, table.getName());
+            pst.setInt(2, table.getMinSeats());
+            pst.setInt(3, table.getMaxSeats());
+            pst.setString(4, table.getDescription());
+
+            int rs = pst.executeUpdate();
+            if (rs > 0) {
+                msg = "Thêm bàn thành công";
+            }
+        } catch (SQLException ex) {
+            msg = ex.getMessage();
+            ex.printStackTrace();
+        }
+        return msg;
+    }
+
+    @Override
+    public ArrayList<TimeStatistic> getStatistic(String startDate, String endDate) throws RemoteException {
+        ArrayList<TimeStatistic> statistics = new ArrayList<>();
+
+        String sql = "SELECT X.dateBooking, COUNT(X.dateBooking) AS counting\n"
+                + "FROM \n"
+                + "(\n"
+                + "SELECT * FROM tblBooking\n"
+                + "WHERE dateBooking < ? AND dateBooking >= ?\n"
+                + ") X\n"
+                + "GROUP BY X.dateBooking\n"
+                + "ORDER BY counting DESC";
+        
+        try {
+            PreparedStatement pst = con.prepareStatement(sql, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
+            ResultSet rs = pst.executeQuery();
+            if (rs.last()) {
+                rs.beforeFirst();
+            }
+            
+            while (rs.next()) {
+                TimeStatistic ts = mapping.timeStatisticMapping(rs);
+                statistics.add(ts);
+            }
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+        }
+        
+        return statistics;
     }
 
 }

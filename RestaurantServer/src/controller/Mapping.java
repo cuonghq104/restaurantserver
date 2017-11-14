@@ -7,6 +7,7 @@ import java.util.logging.Logger;
 import model.Restaurant;
 import model.Table;
 import model.Time;
+import model.TimeStatistic;
 import view.ServerView;
 
 /**
@@ -93,5 +94,22 @@ public class Mapping {
         }
         return null;
        
+    }
+    
+    public TimeStatistic timeStatisticMapping(ResultSet rs) {
+        TimeStatistic ts = new TimeStatistic();
+        
+        try {
+            String date = rs.getString("dateBooking");
+            int counting = rs.getInt("counting");
+            
+            ts.setDateBooking(date);
+            ts.setQuantity(counting);
+            
+        } catch (SQLException ex) {
+            Logger.getLogger(Mapping.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        
+        return ts;
     }
 }
