@@ -48,7 +48,7 @@ public class Controller extends UnicastRemoteObject implements RMIService {
 
     private Mapping mapping;
 
-    public Controller() throws RemoteException {
+        public Controller() throws RemoteException {
         view = new ServerView();
         view.setController(this);
         connectDatabase();
@@ -258,7 +258,7 @@ public class Controller extends UnicastRemoteObject implements RMIService {
                 + "WHERE id = ? ";
 
         Time time = null;
-        
+
         try {
             PreparedStatement pst = con.prepareStatement(sql, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
             pst.setInt(1, id);
@@ -285,16 +285,16 @@ public class Controller extends UnicastRemoteObject implements RMIService {
         String date1 = format1.format(date);
         return date1;
     }
-    
+
     @Override
     public String booking(Booking booking) throws RemoteException {
-        
+
         String msg = "";
-        
+
         Table table = null;
         String sql = "INSERT INTO tblBooking(idRestaurant, numberOfCustomer, idTable, idTime, dateBooking, dateCreated, status) "
                 + "VALUES(?, ?, ?, ?, ?, ?, ?) ";
-        
+
         try {
             PreparedStatement pst = con.prepareStatement(sql);
             pst.setInt(1, booking.getRestaurant().getId());
@@ -304,9 +304,9 @@ public class Controller extends UnicastRemoteObject implements RMIService {
             pst.setString(5, booking.getDateBooking());
             pst.setString(6, getCurrentDate());
             pst.setString(7, "booking");
-            
+
             int rs = pst.executeUpdate();
-            
+
             if (rs > 0) {
                 msg = "Đặt bàn thành công";
             }
@@ -317,4 +317,3 @@ public class Controller extends UnicastRemoteObject implements RMIService {
         return msg;
     }
 }
-
