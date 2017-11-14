@@ -5,6 +5,10 @@
  */
 package controller;
 
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.net.ServerSocket;
+import java.net.Socket;
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
@@ -18,9 +22,9 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import model.Account;
 import model.Booking;
+import model.Customer;
 import model.Restaurant;
 import model.Table;
 import model.Time;
@@ -46,15 +50,28 @@ public class Controller extends UnicastRemoteObject implements RMIService {
     private String dbUrl = "jdbc:sqlserver://localhost;databaseName=restaurant_booking;user=sa;password=123456789";
     private String dbClass = "com.microsoft.sqlserver.jdbc.SQLServerDriver";
 
+    //Added
+    private ServerSocket myServer;
+    private Socket clientSocket;
+
     private Mapping mapping;
 
-        public Controller() throws RemoteException {
+    public Controller() throws RemoteException {
         view = new ServerView();
         view.setController(this);
         connectDatabase();
         createRMIService();
         mapping = new Mapping();
         mapping.setView(view);
+
+        try {
+            //Added
+            myServer = new ServerSocket(rmiPort);
+            clientSocket = myServer.accept();
+        } catch (Exception ex) {
+//            Logger.getLogger(Controller.class.getName()).log(Level.SEVERE, null, ex);
+            ex.printStackTrace();
+        }
     }
 
     public ServerView getView() {
@@ -315,5 +332,206 @@ public class Controller extends UnicastRemoteObject implements RMIService {
             ex.printStackTrace();
         }
         return msg;
+    }
+
+    //Added
+    public void ReceiveObject() {
+        try {
+            ObjectInputStream ois = new ObjectInputStream(clientSocket.getInputStream());
+            Object o = ois.readObject();
+
+            if (o instanceof Object[]) {
+                Object[] arr = (Object[]) o;
+                if (arr[0] != null && arr[0] instanceof Account && arr[1] == null) {
+                    Account acc = (Account) arr[0];
+                    if (CheckAccountExist(acc)) {
+                        SendResult("OK");
+                    } else {
+                        SendResult("FAILED");
+                    }
+                } else if (arr[0] != null && arr[1] != null && arr[0] instanceof Account && arr[1] instanceof Customer) {
+                    Account acc = (Account) arr[0];
+                    Customer cus = (Customer) arr[1];
+
+                    String result = "";
+
+                    if (!CheckAccountExist(acc)) {
+                        result = "OK";
+
+                        if (AddAccount(acc)) {
+                            if (!CheckCustomerExist(cus)) {
+                                if (AddCustomer(cus)) {
+                                    SendResult(result);
+                                } else {
+                                    result = "FAILED";
+                                    SendResult(result);
+                                }
+                            }
+                        } else {
+                            result = "FAILED";
+                            SendResult(result);
+                        }
+                    } else {
+                        result = "FAILED";
+                        SendResult(result);
+                    }
+                }
+            }
+        } catch (Exception ex) {
+//            Logger.getLogger(ServerCtrl.class.getName()).log(Level.SEVERE, null, ex);
+            ex.printStackTrace();
+        }
+    }
+
+    public boolean CheckAccountExist(Account acc) {
+        if (acc != null) {
+
+            String sql = "SELECT username FROM tblAccount WHERE username = ?";
+
+            try {
+                PreparedStatement ps = con.prepareStatement(sql, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
+                ps.setString(1, acc.getUsername());
+
+                ResultSet rs = ps.executeQuery();
+
+                if (!rs.last()) {
+                    System.out.println(rs);
+                    return false;
+                }
+
+                return true;
+            } catch (Exception ex) {
+//                Logger.getLogger(ServerCtrl.class.getName()).log(Level.SEVERE, null, ex);
+                ex.printStackTrace();
+            }
+        }
+
+        return false;
+    }
+
+    public void SendResult(String result) {
+        try {
+            ObjectOutputStream oos = new ObjectOutputStream(clientSocket.getOutputStream());
+            oos.writeObject(result);
+        } catch (Exception ex) {
+//            Logger.getLogger(ServerCtrl.class.getName()).log(Level.SEVERE, null, ex);
+            ex.printStackTrace();
+        }
+    }
+
+    public boolean CheckCustomerExist(Customer cus) {
+        if (cus != null) {
+
+            String sql = "SELECT name FROM tblCustomer WHERE name = ?";
+
+            try {
+                PreparedStatement ps = con.prepareStatement(sql, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
+                ps.setString(1, cus.getName());
+
+                ResultSet rs = ps.executeQuery();
+
+                if (!rs.last()) {
+                    System.out.println(rs);
+                    return false;
+                }
+
+                return true;
+            } catch (Exception ex) {
+//                Logger.getLogger(ServerCtrl.class.getName()).log(Level.SEVERE, null, ex);
+                ex.printStackTrace();
+            }
+        }
+
+        return false;
+    }
+
+    public boolean AddCustomer(Customer customer) {
+        String sql = "INSERT INTO tblCustomer (name, address, tel, email, accountId) VALUES (?,?,?,?,?)";
+
+        int id = GetMaxId();
+
+        try {
+            PreparedStatement ps = con.prepareStatement(sql, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
+            ps.setString(1, customer.getName());
+            ps.setString(2, customer.getAddress());
+            ps.setString(3, customer.getTel());
+            ps.setString(4, customer.getEmail());
+            ps.setInt(5, id);
+
+            ps.executeUpdate();
+            return true;
+        } catch (Exception ex) {
+//            Logger.getLogger(ServerCtrl.class.getName()).log(Level.SEVERE, null, ex);
+            ex.printStackTrace();
+        }
+
+        return false;
+    }
+
+    public boolean AddAccount(Account acc) {
+        String sql = "INSERT INTO tblAccount (username, password, type) VALUES (?,?,?)";
+
+        try {
+            PreparedStatement ps = con.prepareStatement(sql, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
+            ps.setString(1, acc.getUsername());
+            ps.setString(2, acc.getPassword());
+            ps.setString(3, acc.getType());
+
+            ps.executeUpdate();
+            return true;
+        } catch (Exception ex) {
+//            Logger.getLogger(ServerCtrl.class.getName()).log(Level.SEVERE, null, ex);
+            ex.printStackTrace();
+        }
+
+        return false;
+    }
+
+    private int GetMaxId() {
+        String sql = "SELECT MAX(id) FROM tblAccount";
+        int max = 0;
+
+        try {
+            PreparedStatement ps = con.prepareStatement(sql, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
+
+            ResultSet rs = ps.executeQuery();
+
+            if (rs.last()) {
+                max = rs.getInt(1);
+                return max;
+            }
+        } catch (Exception ex) {
+//            Logger.getLogger(ServerCtrl.class.getName()).log(Level.SEVERE, null, ex);
+            ex.printStackTrace();
+        }
+
+        return max;
+    }
+
+    private Restaurant GetRestaurantById(int id) {
+        Restaurant res = null;
+
+        String sql = "SELECT * FROM tblRestaurant WHERE id=?";
+
+        try {
+            PreparedStatement ps = con.prepareStatement(sql, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
+            ps.setInt(1, id);
+
+            ResultSet rs = ps.executeQuery();
+            if (rs.last()) {
+                res = new Restaurant();
+                res.setName(rs.getString("name"));
+                res.setAddress(rs.getString("address"));
+                res.setTel(rs.getString("tel"));
+                res.setDescription(rs.getString("description"));
+
+                return res;
+            }
+        } catch (Exception ex) {
+//            Logger.getLogger(ServerCtrl.class.getName()).log(Level.SEVERE, null, ex);
+            ex.printStackTrace();
+        }
+
+        return res;
     }
 }
