@@ -22,6 +22,8 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import model.Account;
 import model.Booking;
 import model.Customer;
@@ -67,8 +69,11 @@ public class Controller extends UnicastRemoteObject implements RMIService {
 
         try {
             //Added
-            myServer = new ServerSocket(rmiPort);
-            clientSocket = myServer.accept();
+            myServer = new ServerSocket(6789);
+            while (true) {
+                clientSocket = myServer.accept();
+                ReceiveObject();
+            }
         } catch (Exception ex) {
 //            Logger.getLogger(Controller.class.getName()).log(Level.SEVERE, null, ex);
             ex.printStackTrace();
@@ -500,14 +505,16 @@ public class Controller extends UnicastRemoteObject implements RMIService {
                 + ") X\n"
                 + "GROUP BY X.dateBooking\n"
                 + "ORDER BY counting DESC";
-        
+
         try {
             PreparedStatement pst = con.prepareStatement(sql, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
+            pst.setString(1, endDate);
+            pst.setString(2, startDate);
             ResultSet rs = pst.executeQuery();
             if (rs.last()) {
                 rs.beforeFirst();
             }
-            
+
             while (rs.next()) {
                 TimeStatistic ts = mapping.timeStatisticMapping(rs);
                 statistics.add(ts);
@@ -515,7 +522,7 @@ public class Controller extends UnicastRemoteObject implements RMIService {
         } catch (SQLException ex) {
             ex.printStackTrace();
         }
-        
+
         return statistics;
     }
 
@@ -718,5 +725,59 @@ public class Controller extends UnicastRemoteObject implements RMIService {
         }
 
         return res;
+    }
+
+    @Override
+    public ArrayList<Booking> seeBookingOnDate(String date) throws RemoteException {
+        ArrayList<Booking> bookings = new ArrayList<>();
+
+        try {
+
+            String sql = "SELECT *\n"
+                    + "FROM tblBooking\n"
+                    + "WHERE dateBooking = ?\n";
+
+            PreparedStatement pst = con.prepareStatement(sql, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
+            pst.setString(1, date);
+
+            ResultSet rs = pst.executeQuery();
+            if (rs.last()) {
+                rs.beforeFirst();
+            }
+
+            while (rs.next()) {
+                Booking booking = new Booking();
+
+                int id = rs.getInt(1);
+                int idCustomer = rs.getInt(2);
+                int numberOfCustomer = rs.getInt(3);
+                int idRestaurant = rs.getInt(4);
+                int idTable = rs.getInt(5);
+                int idTime = rs.getInt(6);
+                String dateBooking = rs.getString(7);
+                String dateCreated = rs.getString(8);
+                String status = rs.getString(9);
+
+                Table table = getTableById(idTable);
+                Restaurant restaurant = getRestaurantById(idRestaurant);
+                Time time = getTimeById(idTime);
+                Customer customer = getCustomerById(idCustomer);
+
+                booking.setCustomer(customer);
+                booking.setDateBooking(dateBooking);
+                booking.setDateCreate(dateCreated);
+                booking.setId(id);
+                booking.setNumberOfCustomer(numberOfCustomer);
+                booking.setRestaurant(restaurant);
+                booking.setStatus(status);
+                booking.setTable(table);
+                booking.setTime(time);
+
+                bookings.add(booking);
+            }
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+        }
+        return bookings;
     }
 }
