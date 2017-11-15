@@ -27,10 +27,12 @@ import java.util.logging.Logger;
 import model.Account;
 import model.Booking;
 import model.Customer;
+import model.Employee;
 import model.Restaurant;
 import model.Table;
 import model.Time;
 import model.TimeStatistic;
+import model.User;
 import rmi.RMIService;
 import view.ServerView;
 
@@ -537,9 +539,7 @@ public class Controller extends UnicastRemoteObject implements RMIService {
                 if (arr[0] != null && arr[0] instanceof Account && arr[1] == null) {
                     Account acc = (Account) arr[0];
                     if (CheckAccountExist(acc)) {
-                        SendResult("OK");
-                    } else {
-                        SendResult("FAILED");
+                        SendResult(GetUserByAccount(acc));
                     }
                 } else if (arr[0] != null && arr[1] != null && arr[0] instanceof Account && arr[1] instanceof Customer) {
                     Account acc = (Account) arr[0];
@@ -574,6 +574,58 @@ public class Controller extends UnicastRemoteObject implements RMIService {
             ex.printStackTrace();
         }
     }
+    
+    private User GetUserByAccount(Account acc) {
+        if (acc != null) {
+            String sql = "SELECT * FROM tblAccount WHERE username = ?";
+
+            try {
+                PreparedStatement ps = con.prepareStatement(sql, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
+                ps.setString(1, acc.getUsername());
+
+                ResultSet rs = ps.executeQuery();
+
+                if (!rs.last()) {
+                    if(rs.getString("type").equals("Employee")) {
+                        String empSql = "SELECT * FROM tblEmployee WHERE accountId=?";
+                        
+                        PreparedStatement psEmp = con.prepareStatement(empSql, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
+                        psEmp.setInt(1, rs.getInt("id"));
+                        
+                        ResultSet rsEmp = psEmp.executeQuery();
+                        
+                        if(rsEmp.last()) {
+                            Employee emp = new Employee();
+                            emp.setName(rsEmp.getString(rsEmp.getString("name")));
+                            emp.setRestaurant(GetRestaurantById(rs.getInt("restaurantId")));
+                            
+                            return emp;
+                        }
+                    }
+                    else {
+                        String cusSql = "SELECT * FROM tblCustomer WHERE accountId=?";
+                        
+                        PreparedStatement psCus = con.prepareStatement(cusSql, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
+                        psCus.setInt(1, rs.getInt("id"));
+                        
+                        ResultSet rsCus = psCus.executeQuery();
+                        
+                        if(rsCus.last()) {
+                            Customer cus = new Customer();
+                            cus.setName(rsCus.getString(rsCus.getString("name")));
+                            
+                            return cus;
+                        }
+                    }
+                }
+            } catch (Exception ex) {
+//                Logger.getLogger(ServerCtrl.class.getName()).log(Level.SEVERE, null, ex);
+                ex.printStackTrace();
+            }
+        }
+
+        return null;
+    }
 
     public boolean CheckAccountExist(Account acc) {
         if (acc != null) {
@@ -601,10 +653,13 @@ public class Controller extends UnicastRemoteObject implements RMIService {
         return false;
     }
 
-    public void SendResult(String result) {
+    public void SendResult(Object result) {
         try {
             ObjectOutputStream oos = new ObjectOutputStream(clientSocket.getOutputStream());
             oos.writeObject(result);
+
+//            oos.close();
+//            clientSocket.close();
         } catch (Exception ex) {
 //            Logger.getLogger(ServerCtrl.class.getName()).log(Level.SEVERE, null, ex);
             ex.printStackTrace();
